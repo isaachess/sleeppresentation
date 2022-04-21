@@ -38,15 +38,18 @@ func TestNotifyValue_01(t *testing.T) {
 	}
 }
 
+// testDB fulfills the database interface
 type testDB struct {
 	cache sync.Map
 }
 
+// Save simply stores the key/val pair in the map.
 func (tdb *testDB) Save(key, val string) error {
 	tdb.cache.Store(key, val)
 	return nil
 }
 
+// Get loads and returns the value stored at key.
 func (tdb *testDB) Get(key string) (string, error) {
 	val, ok := tdb.cache.Load(key)
 	if !ok {

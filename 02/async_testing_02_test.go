@@ -37,15 +37,21 @@ func TestNotifyValue_02(t *testing.T) {
 	}
 }
 
+// testDB_02 fulfills the database interface, but allows for signaling when an
+// expected number of saves has completed.
 type testDB_02 struct {
 	cache         sync.Map
 	expectedSaves int
 
-	mu     sync.Mutex
-	saves  int
+	mu    sync.Mutex
+	saves int
+
+	once   sync.Once
 	notify chan struct{}
 }
 
+// NewTestDB_02 creates a new testDB_02, set up for the expected number of saves
+// provided.
 func NewTestDB_02(expectedSaves int) *testDB_02 {
 	return &testDB_02{
 		expectedSaves: expectedSaves,
@@ -53,18 +59,21 @@ func NewTestDB_02(expectedSaves int) *testDB_02 {
 	}
 }
 
+// Save stores the key/val pair in the map. If the number of saves >= expected,
+// it signals that the saves have been received.
 func (tdb *testDB_02) Save(key, val string) error {
 	tdb.cache.Store(key, val)
 
 	tdb.mu.Lock()
 	tdb.saves++
 	if tdb.saves >= tdb.expectedSaves {
-		close(tdb.notify)
+		tdb.once.Do(func() { close(tdb.notify) })
 	}
 	tdb.mu.Unlock()
 	return nil
 }
 
+// Get loads and returns the value stored at key.
 func (tdb *testDB_02) Get(key string) (string, error) {
 	val, ok := tdb.cache.Load(key)
 	if !ok {
@@ -78,6 +87,7 @@ func (tdb *testDB_02) Get(key string) (string, error) {
 	return str, nil
 }
 
+// Wait will block until the expected number of saves has been reached.
 func (tdb *testDB_02) Wait(ctx context.Context) {
 	select {
 	case <-tdb.notify:
